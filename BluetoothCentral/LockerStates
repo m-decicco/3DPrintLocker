@@ -1,0 +1,123 @@
+import asyncio
+import bleak
+import array 
+import time
+import PySimpleGUI as sg
+
+def make_window():
+    layout = [[sg.VPush()],
+              [sg.Push(), sg.Button("CLOSE", font = ("Helvetica", 20))],
+              [sg.Push(), sg.Text(" ",font = ("Helvetica", 40)),sg.Push()],
+              [sg.Push(), sg.Text("Select locker",font = ("Helvetica", 40)), sg.Push()],
+              [sg.Push(), sg.Button("1", key = '-L1-',font = ("Helvetica", 20), size = (4,2)), sg.Button('----', font = ("Helvetica", 20), size = (4,2)), sg.Button("2", key = '-L2-',font = ("Helvetica", 20), size = (4,2)),sg.Push()],
+              [sg.Push(), sg.Button("3", key = '-L3-',font = ("Helvetica", 20), size = (4,2)), sg.Button("4", key = '-L4-',font = ("Helvetica", 20), size = (4,2)),sg.Button("5", key = '-L5-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("6", key = '-L6-',font = ("Helvetica", 20), size = (4,2)), sg.Button("7", key = '-L7-',font = ("Helvetica", 20), size = (4,2)),sg.Button("8", key = '-L8-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("9", key = '-L9-',font = ("Helvetica", 20), size = (4,2)), sg.Button("10", key = '-L10-',font = ("Helvetica", 20), size = (4,2)),sg.Button("11", key = '-L11-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("12", key = '-L12-',font = ("Helvetica", 20), size = (4,2)), sg.Button("13", key = '-L13-',font = ("Helvetica", 20), size = (4,2)),sg.Button("14", key = '-L14-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("15", key = '-L15-',font = ("Helvetica", 20), size = (4,2)), sg.Button("16", key = '-L16-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.VPush()]]
+    
+    return sg.Window('LOCKER', layout, resizable=True, size=(480,800), no_titlebar=True, location=(0,0), keep_on_top= True)
+
+def lockScreen():
+    code = ""
+    window = make_window()
+    running = True
+    while running:
+        event, value= window.read()
+        #print(event)
+        if event==("CLOSE"):
+            running = False
+        else:
+        #window['-TOP-'].update("INCORRECT CODE")
+            if len(event) == 4:
+                foo = (event[2])
+            else:
+                foo = (event[2]+event[3])
+            #window.refresh()
+            print(foo)
+    window.close()
+  
+
+def print_id(array):
+    print(" Current Users: \n________________")
+    print(f"|{to_four(str(array[0]))}|----| {str(array[1])}%|")
+    print(f"|{to_four(str(array[3]))}|{to_four(str(array[3]))}|{to_four(str(array[4]))}|")
+    print(f"|{to_four(str(array[6]))}|{to_four(str(array[6]))}|{to_four(str(array[7]))}|")
+    print(f"|{to_four(str(array[9]))}|{to_four(str(array[9]))}|{to_four(str(array[10]))}|")
+    print(f"|{to_four(str(array[12]))}|{to_four(str(array[12]))}|{to_four(str(array[13]))}|")
+    print(f"| {to_four(str(array[14]))} | {to_four(str(array[15]))}  |")
+    print("⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻⎻")
+
+def to_four(input_str):
+    while len(input_str) < 4:
+        input_str = "0" + input_str
+    return input_str
+
+
+
+async def connect_to_ble_device(device_address):
+    user_data = [0] * 16
+    client = bleak.BleakClient(device_address)
+    locker = 0
+    try:
+        await client.connect()
+        running = True
+        services = await client.get_services()
+        for service in services:
+            if service.uuid == "19b10001-e8f2-537e-4f6c-d104768a1214":
+                for characteristic in service.characteristics:
+                    #print("Characteristic UUID:", characteristic.uuid)
+                    try:
+                        value = await client.read_gatt_char(characteristic.uuid)
+                        decoded_value = int.from_bytes(value, byteorder='little')
+                        user_data[int(characteristic.uuid[-2] + characteristic.uuid[-1]) - 1] = decoded_value
+                    except bleak.BleakError as e:
+                        print("Error reading characteristic:", e)
+        window = make_window()
+        window.read(timeout = 10)
+        for x in range(len(user_data)):
+            #print('-L' + str(x+1) + '-')
+            #print(user_data[x])
+            if x != 1:
+                window['-L' + str(x+1) + '-'].update(to_four(str(user_data[x])))
+            else:
+                window['-L' + str(x+1) + '-'].update(" "+str(user_data[x])+"%")
+            window.refresh()
+        while running:
+            event, value= window.read()
+            #print(event)
+            if event==("CLOSE"):
+                running = False
+                window.close()
+            else:
+            #window['-TOP-'].update("INCORRECT CODE")
+                if len(event) == 4:
+                    foo = (event[2])
+                else:
+                    foo = (event[2]+event[3])
+                #window.refresh()
+                print(foo)
+                locker = int(foo)
+                print(locker)
+                if locker != 0:
+                    try:
+                        locker_bytes = locker.to_bytes(1, 'little') 
+                        #print(locker_bytes)
+                        #print(service.characteristics[0].uuid)
+                        await client.write_gatt_char(service.characteristics[0].uuid, locker_bytes,True)
+                    except bleak.BleakError as e:
+                        print("Error writing to characteristic:", e)
+        
+
+    except bleak.BleakError as e:
+        print("Error:", e)
+    finally:
+        print_id(user_data)
+        
+        await client.disconnect()
+
+if __name__ == "__main__":
+    lockScreen()
+    #device_address = "DC:54:75:CF:45:D1"  # Replace with the address of your device
+    #asyncio.run(connect_to_ble_device(device_address))

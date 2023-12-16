@@ -1,0 +1,32 @@
+import asyncio
+import bleak
+
+async def connect_to_ble_device(device_address):
+    client = bleak.BleakClient(device_address)
+
+    try:
+        await client.connect()
+
+        # Discover services and characteristics
+        services = await client.get_services()
+        for service in services:
+            print("Service UUID:", service.uuid)
+            if (service.uuid == "19b10001-e8f2-537e-4f6c-d104768a1214"):
+                for characteristic in service.characteristics:
+                    print("Characteristic UUID:", characteristic.uuid)
+
+                    try:
+                        value = await client.read_gatt_char(characteristic.uuid)
+                        decoded_value = int.from_bytes(value, byteorder='little')
+                        print("Received data:", decoded_value)
+                    except:
+                        print("No Value")
+
+    except bleak.BleakError as e:
+        print("Error:", e)
+    finally:
+        await client.disconnect()
+
+if __name__ == "__main__":
+    device_address = "DC:54:75:CF:45:D1"  # Replace with the address of your device
+    asyncio.run(connect_to_ble_device(device_address))

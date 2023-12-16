@@ -1,0 +1,33 @@
+import asyncio
+import bleak
+import time
+
+async def connect_to_ble_device(device_address):
+    client = bleak.BleakClient(device_address)
+
+    try:
+        await client.connect()
+        for i in range(5):
+            # Write an integer value (1 for ON, 0 for OFF)
+            await client.write_gatt_char("19B10001-E8F2-537E-4F6C-D104768A1214", bytearray([1]))
+            time.sleep(1)  # Add a delay to allow time for processing
+            value = await client.read_gatt_char("19B10001-E8F2-537E-4F6C-D104768A1214")
+            decoded_value = int.from_bytes(value, byteorder='little')
+            print("Received data:", decoded_value)
+            time.sleep(5)
+            
+            # Write an integer value (0 for OFF)
+            await client.write_gatt_char("19B10001-E8F2-537E-4F6C-D104768A1214", bytearray([0]))
+            time.sleep(1)  # Add a delay to allow time for processing
+            value = await client.read_gatt_char("19B10001-E8F2-537E-4F6C-D104768A1214")
+            decoded_value = int.from_bytes(value, byteorder='little')
+            print("Received data:", decoded_value)
+
+    except bleak.BleakError as e:
+        print("Error:", e)
+    finally:
+        await client.disconnect()
+
+if __name__ == "__main__":
+    device_address = "DC:54:75:CF:45:D1"  # Replace with the address of your device
+    asyncio.run(connect_to_ble_device(device_address))
