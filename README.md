@@ -1,0 +1,1 @@
+Final Product folder contains all SolidWorks part files as well as laser cut and 3d print files. OS_R4 is the script running on the Arduinio R4 within the locker and LockerStates.zip is the python script runnable on a windows machines to allow bluetooth interfacing 
