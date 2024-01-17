@@ -42,6 +42,7 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 File myFile;
 BLEService lockerService("19B10001-E8F2-537E-4F6C-D104768A1214"); // Bluetooth® Low Energy LED Service
 BLEByteCharacteristic LockerOpen("19B10001-E8F2-537E-4F6C-0000000000", BLERead | BLEWrite);
+BLEIntCharacteristic LockerDrop("19B10001-E8F2-537E-4F6C-0000000100", BLERead | BLEWrite);
 BLEIntCharacteristic Locker1("19B10001-E8F2-537E-4F6C-00000000001", BLERead | BLEWrite);
 BLEIntCharacteristic Locker2("19B10001-E8F2-537E-4F6C-00000000002", BLERead | BLEWrite);
 BLEIntCharacteristic Locker3("19B10001-E8F2-537E-4F6C-00000000003", BLERead | BLEWrite);
@@ -276,8 +277,11 @@ bool checkTime(){
   if(central.connected()){
     fillService();
     int toOpen=0;
+    int toDrop=0;
     toOpen = LockerOpen.value(); //So it checks constantly
+    toDrop = LockerDrop.value();
     Serial.println(toOpen);
+    Serial.println(toDrop);
     if(toOpen != 0 && toOpen <= totalLockers){
       digitalWrite(A0, LOW);
       delay(500);
@@ -287,7 +291,26 @@ bool checkTime(){
       delay(500);
       digitalWrite(A0, HIGH);
     }
-  }
+
+    if(toDrop != 0 && toDrop > 16){
+      digitalWrite(A0, LOW);
+      delay(500);
+      String DropOffData = String(toDrop);
+      int length = DropOffData.length();
+      if (length > 0) {
+        // Extract the last character as a string
+        String lastChar = DropOffData.substring(length - 1);
+        DropOffData[length-1] = '\0';
+        DropOffData.trim();
+
+        // Convert the last character string to an integer
+        int lockerType = lastChar.toInt();
+        Serial.println("Remote Drop ID: " + DropOffData +", Type" + String(lockerType));
+        LockerDrop.writeValue(fillLocker(DropOffData,lockerType));
+        delay(500);
+        digitalWrite(A0, HIGH);
+    }
+  }}
   if((millis() - timer) > timeout){ //if inactive for 10s, turn it off
     timer = millis();
     return true;
@@ -666,8 +689,30 @@ void setup() {
   RTC.setTimeIfNotRunning(startTime);
   instance = EEPROM.get(1000,instance); //1000 should be middle of nowhere
   Serial.println(instance);
+
+
+  //collecting battery data
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+  lcd.setCursor(0, 0); //
+  lcd.print("What Size Bat");
+  customKeypad.tick();
+  char customKey = '\0';
+  while(customKey == '\0'){
+    customKeypad.tick();
+    keypadEvent e = customKeypad.read();
+    if(e.bit.EVENT == KEY_JUST_PRESSED) customKey = (char)e.bit.KEY;
+    delay(10);
+
+  }
+  storeBAT(customKey);
+  lcd.clear();
+  lcd.setCursor(3, 0); //
+  lcd.print("BT INIT.");
+
   //Bluetooth
-  delay(1000);
+  
   if (!BLE.begin()) {
     Serial.println("starting Bluetooth® Low Energy module failed!");
 
@@ -678,6 +723,7 @@ void setup() {
 
   // add the characteristic to the service
   lockerService.addCharacteristic(LockerOpen);
+  lockerService.addCharacteristic(LockerDrop);
   lockerService.addCharacteristic(Locker1);
   lockerService.addCharacteristic(Locker2);
   lockerService.addCharacteristic(Locker3);
@@ -696,7 +742,10 @@ void setup() {
   lockerService.addCharacteristic(Locker16);
   BLE.addService(lockerService);
   BLE.advertise();
-  
+  lcd.clear();
+  lcd.setCursor(5, 0); //
+  lcd.print("DONE");
+  delay(500);
 
   pinMode(A0, OUTPUT); //For disabling the servos
   digitalWrite(A0, LOW);
@@ -717,7 +766,7 @@ void setup() {
   for(int i =0; i<totalLockers;i++){
     pwm.setPin(i, SERVOCLOSE+Lockers[i].offset);
   }
-  lcd.init();
+  
   delay(500);
   
   digitalWrite(A0, HIGH);
@@ -743,21 +792,7 @@ void setup() {
   fillService();
   Serial.println(printID());
   Serial.println("Current Time: "+ getTime());
-  //collecting battery data
-  lcd.backlight();
-  lcd.clear();
-  lcd.setCursor(0, 0); //
-  lcd.print("What Size Bat");
-  customKeypad.tick();
-  char customKey = '\0';
-  while(customKey == '\0'){
-    customKeypad.tick();
-    keypadEvent e = customKeypad.read();
-    if(e.bit.EVENT == KEY_JUST_PRESSED) customKey = (char)e.bit.KEY;
-    delay(10);
-
-  }
-  storeBAT(customKey);
+  
   
 }
 
@@ -795,7 +830,7 @@ byte fillLocker(String ID, int type){ //for drop off
   }
 
   for (int i = 0; i < totalLockers; i++){
-    if(Lockers[i].type == typeIn && Lockers[i].student_id == ID.toInt()){
+    if(Lockers[i].type >= typeIn && Lockers[i].student_id == ID.toInt()){
       Serial.println("Reuse? (1 yes 2 no)");
       lcd.clear();
       lcd.setCursor(0, 0); //
@@ -820,7 +855,7 @@ byte fillLocker(String ID, int type){ //for drop off
   }
   for (int i = 0; i < totalLockers; i++){ //1 (1,3,4,5) //2 (6,7,8,9,10,11,12,13,14) //3 (15,16)
     //Lockers[i].refeshData();
-    if(Lockers[i].type == typeIn){
+    if(Lockers[i].type >= typeIn){
       //reuse
       if(Lockers[i].student_id == ID.toInt() && reuse){
         Lockers[i].student_id = ID.toInt();
