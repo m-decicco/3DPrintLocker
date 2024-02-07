@@ -6,18 +6,18 @@ import PySimpleGUI as sg
 
 def make_window():
     layout = [[sg.VPush()],
-              [sg.Text("Status:", font = ("Helvetica", 18)), sg.Text("Disconnected", key = 'S',font = ("Helvetica", 18)),sg.Push(),sg.Button("Refresh", font = ("Helvetica", 20)),sg.Button("Close", font = ("Helvetica", 20))],
+              [sg.Text("Status:", font = ("Helvetica", 18)), sg.Text("Connecting...", key = 'S',font = ("Helvetica", 18)),sg.Push(),sg.Button("Refresh", font = ("Helvetica", 20)),sg.Button("Close", font = ("Helvetica", 20))],
               [sg.Text("Last Locker Opened:",font = ("Helvetica", 18)),sg.Text("-",text_color= 'red',key = 'LO',font = ("Helvetica", 18)),sg.Push(), sg.Text(" ",font = ("Helvetica", 40)),sg.Button("Drop Off", font = ("Helvetica", 20))],
               [sg.Push(), sg.Text("Select locker to open",font = ("Helvetica", 35)), sg.Push()],
-              [sg.Push(), sg.Button("1", key = '-L1-',font = ("Helvetica", 20), size = (4,2)), sg.Button('----', font = ("Helvetica", 20), size = (4,2)), sg.Button("2", key = '-L2-',font = ("Helvetica", 20), size = (4,2)),sg.Push()],
-              [sg.Push(), sg.Button("3", key = '-L3-',font = ("Helvetica", 20), size = (4,2)), sg.Button("4", key = '-L4-',font = ("Helvetica", 20), size = (4,2)),sg.Button("5", key = '-L5-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
-              [sg.Push(), sg.Button("6", key = '-L6-',font = ("Helvetica", 20), size = (4,2)), sg.Button("7", key = '-L7-',font = ("Helvetica", 20), size = (4,2)),sg.Button("8", key = '-L8-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
-              [sg.Push(), sg.Button("9", key = '-L9-',font = ("Helvetica", 20), size = (4,2)), sg.Button("10", key = '-L10-',font = ("Helvetica", 20), size = (4,2)),sg.Button("11", key = '-L11-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
-              [sg.Push(), sg.Button("12", key = '-L12-',font = ("Helvetica", 20), size = (4,2)), sg.Button("13", key = '-L13-',font = ("Helvetica", 20), size = (4,2)),sg.Button("14", key = '-L14-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
-              [sg.Push(), sg.Button("15", key = '-L15-',font = ("Helvetica", 20), size = (4,2)), sg.Button("16", key = '-L16-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("0000", key = '-L1-',font = ("Helvetica", 20), size = (4,2)), sg.Button('----', font = ("Helvetica", 20), size = (4,2)), sg.Button("0%", key = '-L2-',font = ("Helvetica", 20), size = (4,2)),sg.Push()],
+              [sg.Push(), sg.Button("0000", key = '-L3-',font = ("Helvetica", 20), size = (4,2)), sg.Button("0000", key = '-L4-',font = ("Helvetica", 20), size = (4,2)),sg.Button("0000", key = '-L5-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("0000", key = '-L6-',font = ("Helvetica", 20), size = (4,2)), sg.Button("0000", key = '-L7-',font = ("Helvetica", 20), size = (4,2)),sg.Button("0000", key = '-L8-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("0000", key = '-L9-',font = ("Helvetica", 20), size = (4,2)), sg.Button("0000", key = '-L10-',font = ("Helvetica", 20), size = (4,2)),sg.Button("0000", key = '-L11-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("0000", key = '-L12-',font = ("Helvetica", 20), size = (4,2)), sg.Button("0000", key = '-L13-',font = ("Helvetica", 20), size = (4,2)),sg.Button("0000", key = '-L14-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
+              [sg.Push(), sg.Button("0000", key = '-L15-',font = ("Helvetica", 20), size = (4,2)), sg.Button("0000", key = '-L16-',font = ("Helvetica", 20), size = (4,2)), sg.Push()],
               [sg.VPush()]]
     
-    return sg.Window('MakerSpace Locker', layout, resizable=True, size=(480,800), location=(0,0))
+    return sg.Window('MakerSpace Locker', layout, resizable=True, size=(500,800), location=(0,0))
 def dropoff_window():
     layout = [
                 [sg.Push(),sg.Text('Student ID ',font = ("Helvetica", 15), size=(10,1)),sg.Input(key='-ID-',expand_x=True,font = ("Helvetica", 15)),sg.Push()],
@@ -64,7 +64,11 @@ def to_four(input_str):
 
 async def connect_to_ble_device(device_address):
     user_data = [0] * 16
+    #Twindow = make_window()
+    
+    
     window = make_window()
+    window.read(timeout = 100)
     #window.read(timeout = 1000)
     print("Attempting to connect...")
     client = bleak.BleakClient(device_address)
@@ -73,6 +77,7 @@ async def connect_to_ble_device(device_address):
         await client.connect()
         running = True
         print("Connected!")
+        Twindow.close()
         while running:
             services = await client.get_services()
             for service in services:
@@ -184,17 +189,19 @@ async def connect_to_ble_device(device_address):
 
     except bleak.BleakError as e:
         print("Error:", e)
-        lockScreen()
+        window['S'].update("Failed")
+        event, values = window.read()
+        window.close()
     finally:
         print_id(user_data)
-        
+        window.close()
         await client.disconnect()
 
 if __name__ == "__main__":
     #lockScreen()
-
     device_address = "DC:54:75:CF:45:D1"  # Replace with the address of your device
     asyncio.run(connect_to_ble_device(device_address))
+    
     if(0):
         window = dropoff_window()
         event, values = window.read()
@@ -202,6 +209,3 @@ if __name__ == "__main__":
         if event != "Cancel":
             print(int(values['-ID-']))
         window.close()
-    
-    
-        
